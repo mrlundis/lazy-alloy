@@ -48,7 +48,7 @@ class Application
       .action(@setup)
 
     @program.command('generate [type] [name]')
-      .description('Generate a new (lazy-)alloy type such as a controller.')
+      .description('Generate a new (lazy-)alloy type such as a controller, model, lib.')
       .action(@generate)
 
     @program.parse(process.argv)
@@ -145,7 +145,7 @@ class Application
       app.ensureName()
     else
       console.debug 'What should I generate?'
-      app.program.choose ['controller', 'view'], app.ensureName
+      app.program.choose ['controller', 'view', 'model', 'lib'], app.ensureName
 
   ensureName: (i, type) ->
     app.type = type if type
@@ -170,6 +170,8 @@ class Application
     return {type: "style", fromTo: ["coffee", "tss"]} if inpath "styles/"
     return {type: "alloy", fromTo: ["coffee", "js"]} if inpath "alloy.coffee"
     return {type: "controller", fromTo: ["coffee", "js"]} if inpath "controllers/"
+    return {type: "model", fromTo: ["coffee", "js"]} if inpath "models/"
+    return {type: "lib", fromTo: ["coffee", "js"]} if inpath "lib/"
 
 class Compiler
   logger: console
@@ -178,15 +180,27 @@ class Compiler
   views: ->
     @process "views/", "jade", "xml"
 
+  alloy: ->
+    @process "alloy.coffee", "coffee", "js"
+
   controllers: ->
     @process "controllers/", "coffee", "js"
+
+  models: ->
+    @process "models/", "coffee", "js"
+
+  lib: ->
+    @process "lib/", "coffee", "js"
 
   styles: ->
     @process "styles/", "coffee", "tss"
 
   all: ->
     @views()
+    @alloy()
     @controllers()
+    @models()
+    @lib()
     @styles()
 
   process: (path, from, to) ->
@@ -240,6 +254,7 @@ class Generator
     mkdir subfolder+'views'
     mkdir subfolder+'styles'
     mkdir subfolder+'controllers'
+    mkdir subfolder+'models'
     console.debug 'Setup complete.'
     process.exit()
 
@@ -247,6 +262,10 @@ class Generator
     switch type
       when 'controller'
         createController name
+      when 'model'
+        createModel name
+      when 'lib'
+        createLib name
       when 'jmk'
         not_yet_implemented()
       when 'model'
@@ -265,6 +284,15 @@ class Generator
     console.debug "Creating controller #{name}"
     touch app.subfolder + 'controllers/' + name + '.coffee'
     createView name
+
+  createModel = (name) ->
+    console.debug "Creating model #{name}"
+    touch app.subfolder + 'models/' + name + '.coffee'
+    createView name
+
+  createLib = (name) ->
+    console.debug "Creating lib #{name}"
+    touch app.subfolder + 'lib/' + name + '.coffee'
 
   createView = (name) ->
     console.debug "Building view #{name}"

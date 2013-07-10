@@ -13,11 +13,11 @@
   "bin" : { "lazyalloy" : "./bin/lazy-alloy"},
   "dependencies": {
     "match-files": "0.1.1",
-    "coffee-script": "~1.4.0",
-    "stylus": "~0.32.0",
-    "jade": "~0.28.1",
+    "coffee-script": "~1.6.3",
+    "stylus": "~0.33.1",
+    "jade": "~0.32.0",
     "sty": "latest",
     "watchr": "latest",
-    "commander": "1.1.1"
+    "commander": "1.3.0"
   }
 }
