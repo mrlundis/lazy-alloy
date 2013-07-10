@@ -1,4 +1,4 @@
-fs = require("fs")
+fs = require("node-fs")
 path = require("path")
 match = require("match-files")
 coffee = require("coffee-script")
@@ -213,6 +213,10 @@ class Compiler
 
   file: (from, output, type) ->
     @logger.debug "Building #{type}: #{from} --> #{output}"
+
+    subfolder = path.dirname(output)
+    fs.mkdirSync(subfolder, 0o777, true)
+
     data = fs.readFileSync from, 'utf8'
     compiled = @build[type] data
     fs.writeFileSync output, compiled, 'utf8'
