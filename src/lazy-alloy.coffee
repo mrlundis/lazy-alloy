@@ -108,7 +108,7 @@ class Application
     console.info "Waiting for file change..."
 
     watchr.watch
-      paths: [directory]
+      paths: [directory + '/src']
       listeners:
         error: (err) ->
           console.log "an error occured:", err
@@ -212,13 +212,19 @@ class Compiler
     match.find (process.cwd() + "/" + path), {fileFilters: [filter]}, (err, files) => @files files, from, to
 
   file: (from, output, type) ->
-    @logger.debug "Building #{type}: #{from} --> #{output}"
+    @logger.info "[#{type}] #{from} --> #{output}"
 
     subfolder = path.dirname(output)
     fs.mkdirSync(subfolder, 0o777, true)
 
     data = fs.readFileSync from, 'utf8'
-    compiled = @build[type] data
+    
+    try
+      compiled = @build[type] data, from
+    catch e
+      console.error "[#{type}] Failed to compile #{from}"
+      console.debug "[#{type}] #{e}, on line #{e.location.first_line} column #{e.location.first_column}"
+    
     fs.writeFileSync output, compiled, 'utf8'
 
   files: (files, from, to, to_path) ->
@@ -233,12 +239,13 @@ class Compiler
       @file file, output, to
 
   build:
-    xml: (data) ->
-      jade.compile(data,
-        pretty: true
-      )(this)
+    xml: (data, from) ->
+      jade.render(data,
+        pretty: true,
+        filename: from
+      )
 
-    tss: (data) ->
+    tss: (data, from) ->
       data = @js data
 
       (data.replace "};", "").replace """
@@ -248,7 +255,7 @@ class Compiler
 
         """, ""
 
-    js: (data) ->
+    js: (data, from) ->
       coffee.compile data.toString(), {bare: true}
 
 class Generator
