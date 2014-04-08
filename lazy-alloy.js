@@ -13,16 +13,36 @@ jade = require("jade");
 
 sty = require('sty');
 
+util = require('util');
+
 app = null;
 
 directory = process.cwd();
 
+pad = function(n) {
+  if (n < 10) {
+    return '0' + n;
+  } else {
+    return n;
+  }
+};
+
+formatDate = function() {
+  var d;
+  d = new Date;
+  return "" + (d.getFullYear()) + "-" + (pad(d.getMonth())) + "-" + (pad(d.getDate())) + " " + (pad(d.getHours())) + ":" + (pad(d.getMinutes())) + ":" + (pad(d.getSeconds())) + ": ";
+};
+
 console.info = function(msg) {
-  return console.log(sty.red(msg));
+  return console.log(sty.green(formatDate() + msg));
 };
 
 console.debug = function(msg) {
-  return console.log(sty.green(msg));
+  return console.log(sty.magenta(formatDate() + msg));
+};
+
+console.error = function(msg) {
+  return console.log(sty.bold(sty.red(formatDate() + msg)));
 };
 
 Application = (function() {

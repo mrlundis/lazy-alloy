@@ -4,15 +4,25 @@ match = require("match-files")
 coffee = require("coffee-script")
 jade = require("jade")
 sty = require('sty')
+util = require('util')
 app = null
 
 directory = process.cwd()
 
+pad = (n) ->  
+  if n < 10 then '0'+n else n
+formatDate = () ->
+  d = new Date
+  "#{d.getFullYear()}-#{pad d.getMonth()}-#{pad d.getDate()} #{pad d.getHours()}:#{pad d.getMinutes()}:#{pad d.getSeconds()}: "
+
 console.info = (msg) ->
-  console.log sty.red msg
+  console.log sty.green formatDate() + msg
 
 console.debug = (msg) ->
-  console.log sty.green msg
+  console.log sty.magenta formatDate() + msg
+
+console.error = (msg) ->
+  console.log sty.bold sty.red formatDate() + msg
 
 
 
