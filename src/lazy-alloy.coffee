@@ -33,7 +33,7 @@ class Application
     @titanium = null
 
     @program
-      .version('0.0.4')
+      .version('0.0.5')
       .usage('[COMMAND] [OPTIONS]')
       #.option('-s, --setup', 'Setup lazy-alloy directory structure.')
       # .option('-c, --compile', 'Just compile.')
@@ -119,6 +119,7 @@ class Application
 
     watchr.watch
       paths: [directory + '/src']
+      ignoreHiddenFiles: true
       listeners:
         error: (err) ->
           console.log "an error occured:", err
@@ -155,7 +156,7 @@ class Application
       app.ensureName()
     else
       console.debug 'What should I generate?'
-      app.program.choose ['controller', 'view', 'model', 'lib'], app.ensureName
+      app.program.choose ['controller', 'view', 'model', 'lib', 'widget'], app.ensureName
 
   ensureName: (i, type) ->
     app.type = type if type
@@ -174,6 +175,7 @@ class Application
       !!~ path.indexOf name
 
     return {type: "view", fromTo: ["jade", "xml"]} if inpath ".jade"
+    return {type: "widgets/view", fromTo: ["jade", "xml"]} if inpath "widgets/view"
 
     return null unless inpath ".coffee"
 
@@ -182,6 +184,8 @@ class Application
     return {type: "controller", fromTo: ["coffee", "js"]} if inpath "controllers/"
     return {type: "model", fromTo: ["coffee", "js"]} if inpath "models/"
     return {type: "lib", fromTo: ["coffee", "js"]} if inpath "lib/"
+    return {type: "widgets/style", fromTo: ["coffee", "tss"]} if inpath "widgets/style"
+    return {type: "widgets/controller", fromTo: ["coffee", "js"]} if inpath "widgets/controller"
 
 class Compiler
   logger: console
@@ -190,34 +194,44 @@ class Compiler
   views: ->
     @process "views/", "jade", "xml"
 
-  alloy: ->
-    @process "alloy.coffee", "coffee", "js"
-
   controllers: ->
     @process "controllers/", "coffee", "js"
 
   models: ->
     @process "models/", "coffee", "js"
 
-  lib: ->
-    @process "lib/", "coffee", "js"
-
   styles: ->
     @process "styles/", "coffee", "tss"
 
+  widgets: ->
+    widgets = fs.readdirSync "#{@subfolder}/widgets"
+    for widget in widgets
+      @process "widgets/#{widget}/views/", "jade", "xml"
+      @process "widgets/#{widget}/styles/", "coffee", "tss"
+      @process "widgets/#{widget}/controllers/", "coffee", "js"
+
+  lib: ->
+    @process "lib/", "coffee", "js"
+
+  alloy: ->
+    @process "./alloy.coffee", "coffee", "js"
+
   all: ->
     @views()
-    @alloy()
     @controllers()
     @models()
-    @lib()
     @styles()
+    @widgets()
+    @lib()
+    @alloy()
 
   process: (path, from, to) ->
     path = @subfolder + path
     @logger.info "Preprocessing #{ from } files in #{ path }"
 
-    filter = (dir) -> dir.indexOf(".#{ from }") isnt -1
+    filter = (dir) ->
+      # It should contain the expected extension but not a hidden file (starting with a dot)
+      dir.indexOf(".#{ from }") isnt -1 and dir.indexOf(".") isnt 0
 
     match.find (process.cwd() + "/" + path), {fileFilters: [filter]}, (err, files) => @files files, from, to
 
@@ -234,11 +248,20 @@ class Compiler
     catch e
       console.error "[#{type}] Failed to compile #{from}"
       console.debug "[#{type}] #{e}, on line #{e.location.first_line} column #{e.location.first_column}"
-    
+
+    # Create the base path
+    @mkdirPSync output.split('/')[0...-1]
+
     fs.writeFileSync output, compiled, 'utf8'
 
   files: (files, from, to, to_path) ->
     return @logger.debug "No '*.#{from}' files need to preprocess.. #{files.length} files" if files.length is 0
+
+    # Create necessary directory in case it doesn't exist
+    paths = ['app', 'app/controllers', 'app/styles', 'app/views', 'app/lib']
+    for path in paths
+      unless fs.existsSync path
+        fs.mkdirSync path
 
     for file in files
       break if !!~ file.indexOf "lazyalloy"
@@ -268,14 +291,33 @@ class Compiler
     js: (data, from) ->
       coffee.compile data.toString(), {bare: true}
 
+    json: (data) ->
+      data
+
+  # The equivalent of running `mkdir -p <path>` on the command line
+  mkdirPSync: (segments, pos=0) ->
+    return if pos >= segments.length
+    # Construct path at current segment
+    segment = segments[pos]
+    path = segments[0..pos].join '/'
+
+    # Create path if it doesn't exist
+    if path.length > 0
+      unless fs.existsSync path
+        fs.mkdirSync path
+    # Go deeper
+    @mkdirPSync segments, pos + 1
+
 class Generator
   setup: (subfolder) ->
-    console.info 'Setting up folder structure...'
+    console.info "Setting up folder structure at #{subfolder}"
     mkdir subfolder
     mkdir subfolder+'views'
     mkdir subfolder+'styles'
     mkdir subfolder+'controllers'
     mkdir subfolder+'models'
+    mkdir subfolder+'widgets'
+    mkdir subfolder+'lib'
     console.debug 'Setup complete.'
     process.exit()
 
@@ -290,13 +332,13 @@ class Generator
       when 'jmk'
         not_yet_implemented()
       when 'model'
-        not_yet_implemented()
+        createModel name
       when 'migration'
         not_yet_implemented()
       when 'view'
         createView name
       when 'widget'
-        not_yet_implemented()
+        createWidget name
       else
         console.info "Don't know how to build #{type}"
     process.exit()
@@ -323,6 +365,25 @@ class Generator
   createStyle = (name) ->
     console.debug "Building style #{name}"
     touch app.subfolder + 'styles/' + name + '.coffee'
+
+  createModel = (name) ->
+    console.debug "Building model #{name}"
+    touch app.subfolder + 'models/' + name + '.coffee'
+
+  createWidget = (name) ->
+    console.debug "Creating widget #{name}"
+    mkdir app.subfolder + 'widgets/'
+    mkdir app.subfolder + 'widgets/' + name
+    mkdir app.subfolder + 'widgets/' + name + '/controllers/'
+    mkdir app.subfolder + 'widgets/' + name + '/views/'
+    mkdir app.subfolder + 'widgets/' + name + '/styles/'
+    touch app.subfolder + 'widgets/' + name + '/controllers/widget.coffee'
+    touch app.subfolder + 'widgets/' + name + '/views/widget.jade'
+    touch app.subfolder + 'widgets/' + name + '/styles/widget.coffee'
+
+  createLibrary = (name) ->
+    console.debug "Creating library #{name}"
+    touch app.subfolder + 'lib/' + name + '.coffee'
 
   not_yet_implemented = ->
     console.info "This generator hasn't been built into lazy-alloy yet. Please help us out by building it in:"

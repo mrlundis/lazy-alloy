@@ -52,7 +52,7 @@ Application = (function() {
     app = this;
     this.program = require('commander');
     this.titanium = null;
-    this.program.version('0.0.4').usage('[COMMAND] [OPTIONS]').option('-p, --platform [platform]', '(watch) When done, run titanium on `platform`').option('-d, --directory [dirname]', 'Set source directory (default `src/`)');
+    this.program.version('0.0.5').usage('[COMMAND] [OPTIONS]').option('-p, --platform [platform]', '(watch) When done, run titanium on `platform`').option('-d, --directory [dirname]', 'Set source directory (default `src/`)');
     this.program.command('compile').description('Just compile.').action(this.compile);
     this.program.command('watch').description('Watch file changes & compile.').action(this.watch);
     this.program.command('build <platform>').description('Run titanium on `platform`').action(this.build);
@@ -118,6 +118,7 @@ Application = (function() {
     console.info("Waiting for file change...");
     watchr.watch({
       paths: [directory + '/src'],
+      ignoreHiddenFiles: true,
       listeners: {
         error: function(err) {
           return console.log("an error occured:", err);
@@ -166,7 +167,7 @@ Application = (function() {
       return app.ensureName();
     } else {
       console.debug('What should I generate?');
-      return app.program.choose(['controller', 'view', 'model', 'lib'], app.ensureName);
+      return app.program.choose(['controller', 'view', 'model', 'lib', 'widget'], app.ensureName);
     }
   };
 
@@ -196,6 +197,12 @@ Application = (function() {
     if (inpath(".jade")) {
       return {
         type: "view",
+        fromTo: ["jade", "xml"]
+      };
+    }
+    if (inpath("widgets/view")) {
+      return {
+        type: "widgets/view",
         fromTo: ["jade", "xml"]
       };
     }
@@ -232,6 +239,18 @@ Application = (function() {
         fromTo: ["coffee", "js"]
       };
     }
+    if (inpath("widgets/style")) {
+      return {
+        type: "widgets/style",
+        fromTo: ["coffee", "tss"]
+      };
+    }
+    if (inpath("widgets/controller")) {
+      return {
+        type: "widgets/controller",
+        fromTo: ["coffee", "js"]
+      };
+    }
   };
 
   return Application;
@@ -249,10 +268,6 @@ Compiler = (function() {
     return this.process("views/", "jade", "xml");
   };
 
-  Compiler.prototype.alloy = function() {
-    return this.process("alloy.coffee", "coffee", "js");
-  };
-
   Compiler.prototype.controllers = function() {
     return this.process("controllers/", "coffee", "js");
   };
@@ -261,21 +276,39 @@ Compiler = (function() {
     return this.process("models/", "coffee", "js");
   };
 
-  Compiler.prototype.lib = function() {
-    return this.process("lib/", "coffee", "js");
-  };
-
   Compiler.prototype.styles = function() {
     return this.process("styles/", "coffee", "tss");
   };
 
+  Compiler.prototype.widgets = function() {
+    var widget, widgets, _i, _len, _results;
+    widgets = fs.readdirSync("" + this.subfolder + "/widgets");
+    _results = [];
+    for (_i = 0, _len = widgets.length; _i < _len; _i++) {
+      widget = widgets[_i];
+      this.process("widgets/" + widget + "/views/", "jade", "xml");
+      this.process("widgets/" + widget + "/styles/", "coffee", "tss");
+      _results.push(this.process("widgets/" + widget + "/controllers/", "coffee", "js"));
+    }
+    return _results;
+  };
+
+  Compiler.prototype.lib = function() {
+    return this.process("lib/", "coffee", "js");
+  };
+
+  Compiler.prototype.alloy = function() {
+    return this.process("./alloy.coffee", "coffee", "js");
+  };
+
   Compiler.prototype.all = function() {
     this.views();
-    this.alloy();
     this.controllers();
     this.models();
+    this.styles();
+    this.widgets();
     this.lib();
-    return this.styles();
+    return this.alloy();
   };
 
   Compiler.prototype.process = function(path, from, to) {
@@ -284,7 +317,7 @@ Compiler = (function() {
     path = this.subfolder + path;
     this.logger.info("Preprocessing " + from + " files in " + path);
     filter = function(dir) {
-      return dir.indexOf("." + from) !== -1;
+      return dir.indexOf("." + from) !== -1 && dir.indexOf(".") !== 0;
     };
     return match.find(process.cwd() + "/" + path, {
       fileFilters: [filter]
@@ -306,17 +339,25 @@ Compiler = (function() {
       console.error("[" + type + "] Failed to compile " + from);
       console.debug("[" + type + "] " + e + ", on line " + e.location.first_line + " column " + e.location.first_column);
     }
+    this.mkdirPSync(output.split('/').slice(0, -1));
     return fs.writeFileSync(output, compiled, 'utf8');
   };
 
   Compiler.prototype.files = function(files, from, to, to_path) {
-    var file, output, _i, _len, _results;
+    var file, output, paths, _i, _j, _len, _len1, _results;
     if (files.length === 0) {
       return this.logger.debug("No '*." + from + "' files need to preprocess.. " + files.length + " files");
     }
+    paths = ['app', 'app/controllers', 'app/styles', 'app/views', 'app/lib'];
+    for (_i = 0, _len = paths.length; _i < _len; _i++) {
+      path = paths[_i];
+      if (!fs.existsSync(path)) {
+        fs.mkdirSync(path);
+      }
+    }
     _results = [];
-    for (_i = 0, _len = files.length; _i < _len; _i++) {
-      file = files[_i];
+    for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
+      file = files[_j];
       if (!!~file.indexOf("lazyalloy")) {
         break;
       }
@@ -342,7 +383,28 @@ Compiler = (function() {
       return coffee.compile(data.toString(), {
         bare: true
       });
+    },
+    json: function(data) {
+      return data;
     }
+  };
+
+  Compiler.prototype.mkdirPSync = function(segments, pos) {
+    var segment;
+    if (pos == null) {
+      pos = 0;
+    }
+    if (pos >= segments.length) {
+      return;
+    }
+    segment = segments[pos];
+    path = segments.slice(0, +pos + 1 || 9e9).join('/');
+    if (path.length > 0) {
+      if (!fs.existsSync(path)) {
+        fs.mkdirSync(path);
+      }
+    }
+    return this.mkdirPSync(segments, pos + 1);
   };
 
   return Compiler;
@@ -350,17 +412,19 @@ Compiler = (function() {
 })();
 
 Generator = (function() {
-  var createController, createLib, createModel, createStyle, createView, execUnlessExists, mkdir, not_yet_implemented, touch;
+  var createController, createLib, createLibrary, createModel, createStyle, createView, createWidget, execUnlessExists, mkdir, not_yet_implemented, touch;
 
   function Generator() {}
 
   Generator.prototype.setup = function(subfolder) {
-    console.info('Setting up folder structure...');
+    console.info("Setting up folder structure at " + subfolder);
     mkdir(subfolder);
     mkdir(subfolder + 'views');
     mkdir(subfolder + 'styles');
     mkdir(subfolder + 'controllers');
     mkdir(subfolder + 'models');
+    mkdir(subfolder + 'widgets');
+    mkdir(subfolder + 'lib');
     console.debug('Setup complete.');
     return process.exit();
   };
@@ -380,7 +444,7 @@ Generator = (function() {
         not_yet_implemented();
         break;
       case 'model':
-        not_yet_implemented();
+        createModel(name);
         break;
       case 'migration':
         not_yet_implemented();
@@ -389,7 +453,7 @@ Generator = (function() {
         createView(name);
         break;
       case 'widget':
-        not_yet_implemented();
+        createWidget(name);
         break;
       default:
         console.info("Don't know how to build " + type);
@@ -423,6 +487,28 @@ Generator = (function() {
   createStyle = function(name) {
     console.debug("Building style " + name);
     return touch(app.subfolder + 'styles/' + name + '.coffee');
+  };
+
+  createModel = function(name) {
+    console.debug("Building model " + name);
+    return touch(app.subfolder + 'models/' + name + '.coffee');
+  };
+
+  createWidget = function(name) {
+    console.debug("Creating widget " + name);
+    mkdir(app.subfolder + 'widgets/');
+    mkdir(app.subfolder + 'widgets/' + name);
+    mkdir(app.subfolder + 'widgets/' + name + '/controllers/');
+    mkdir(app.subfolder + 'widgets/' + name + '/views/');
+    mkdir(app.subfolder + 'widgets/' + name + '/styles/');
+    touch(app.subfolder + 'widgets/' + name + '/controllers/widget.coffee');
+    touch(app.subfolder + 'widgets/' + name + '/views/widget.jade');
+    return touch(app.subfolder + 'widgets/' + name + '/styles/widget.coffee');
+  };
+
+  createLibrary = function(name) {
+    console.debug("Creating library " + name);
+    return touch(app.subfolder + 'lib/' + name + '.coffee');
   };
 
   not_yet_implemented = function() {
