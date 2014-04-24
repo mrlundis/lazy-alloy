@@ -337,7 +337,12 @@ Compiler = (function() {
     } catch (_error) {
       e = _error;
       console.error("[" + type + "] Failed to compile " + from);
-      console.debug("[" + type + "] " + e + ", on line " + e.location.first_line + " column " + e.location.first_column);
+      if (e.location) {
+        console.debug("[" + type + "] " + e + ", on line " + e.location.first_line + " column " + e.location.first_column);
+      } else {
+        console.debug("[" + type + "] " + e);
+      }
+      throw e;
     }
     this.mkdirPSync(from.split('/').slice(0, -1));
     return fs.writeFileSync(output, compiled, 'utf8');

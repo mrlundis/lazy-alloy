@@ -252,7 +252,11 @@ class Compiler
       compiled = @build[type] data, from
     catch e
       console.error "[#{type}] Failed to compile #{from}"
-      console.debug "[#{type}] #{e}, on line #{e.location.first_line} column #{e.location.first_column}"
+      
+      if e.location
+        console.debug "[#{type}] #{e}, on line #{e.location.first_line} column #{e.location.first_column}"
+      else 
+        console.debug "[#{type}] #{e}"
 
     # Create the base path
     @mkdirPSync from.split('/')[0...-1]
