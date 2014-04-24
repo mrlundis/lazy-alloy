@@ -363,6 +363,20 @@ Compiler = (function() {
 
   Compiler.prototype.build = {
     xml: function(data, from) {
+      var compiler, extendFile, extendName;
+      compiler = module.exports.compiler;
+      extendName = data.match(/extends? ['"]?(.+)['"]?/);
+      if (extendName && extendName[1]) {
+        extendFile = from.split('/').slice(0, -1).join('/') + '/' + extendName[1] + '.jade';
+        compiler.templateDependees = compiler.templateDependees || {};
+        compiler.templateDependees[extendFile] = compiler.templateDependees[extendFile] || [];
+        if (compiler.templateDependees[extendFile].indexOf(from) === -1) {
+          compiler.templateDependees[extendFile].push(from);
+        }
+      }
+      if (from in compiler.templateDependees) {
+        compiler.files(compiler.templateDependees[from], 'jade', 'xml');
+      }
       return jade.render(data, {
         pretty: true,
         filename: from

@@ -274,6 +274,23 @@ class Compiler
 
   build:
     xml: (data, from) ->
+      compiler = module.exports.compiler
+
+      # Complie any parent templates
+      extendName = data.match /extends? ['"]?(.+)['"]?/
+      
+      if extendName && extendName[1]
+        extendFile = from.split('/')[0...-1].join('/') + '/' + extendName[1] + '.jade'
+
+        compiler.templateDependees = compiler.templateDependees || {}
+        compiler.templateDependees[extendFile] = compiler.templateDependees[extendFile] || []
+        
+        if compiler.templateDependees[extendFile].indexOf(from) == -1
+          compiler.templateDependees[extendFile].push from
+
+      if from of compiler.templateDependees
+        compiler.files compiler.templateDependees[from], 'jade', 'xml'
+
       jade.render(data,
         pretty: true,
         filename: from
