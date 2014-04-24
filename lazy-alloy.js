@@ -53,6 +53,7 @@ Application = (function() {
     this.program.version('0.0.5').usage('[COMMAND] [OPTIONS]').option('-p, --platform [platform]', '(watch) When done, run titanium on `platform`').option('-d, --directory [dirname]', 'Set source directory (default `src/`)');
     this.program.command('compile').description('Just compile.').action(this.compile);
     this.program.command('watch').description('Watch file changes & compile.').action(this.watch);
+    this.program.command('run').description('Compile all files and watch for changes').action(this.compile).action(this.watch);
     this.program.command('build <platform>').description('Run titanium on `platform`').action(this.build);
     this.program.command('new').description('Setup the lazy-alloy directory structure.').action(this.setup);
     this.program.command('generate [type] [name]').description('Generate a new (lazy-)alloy type such as a controller, model, lib.').action(this.generate);

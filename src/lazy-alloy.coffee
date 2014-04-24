@@ -48,6 +48,11 @@ class Application
       .description('Watch file changes & compile.')
       .action(@watch)
 
+    @program.command('run')
+      .description('Compile all files and watch for changes')
+      .action(@compile)
+      .action(@watch)
+
     @program.command('build <platform>')
       .description('Run titanium on `platform`')
       .action(@build)
