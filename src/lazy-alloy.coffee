@@ -1,5 +1,4 @@
 fs = require("node-fs")
-path = require("path")
 match = require("match-files")
 coffee = require("coffee-script")
 jade = require("jade")
@@ -172,7 +171,7 @@ class Application
   getFileType = (path) ->
     #check if file path contains string
     inpath = (name) ->
-      !!~ path.indexOf name
+      path.indexOf(name) > -1
 
     return {type: "view", fromTo: ["jade", "xml"]} if inpath ".jade"
     return {type: "widgets/view", fromTo: ["jade", "xml"]} if inpath "widgets/view"
@@ -204,11 +203,15 @@ class Compiler
     @process "styles/", "coffee", "tss"
 
   widgets: ->
-    widgets = fs.readdirSync "#{@subfolder}/widgets"
-    for widget in widgets
-      @process "widgets/#{widget}/views/", "jade", "xml"
-      @process "widgets/#{widget}/styles/", "coffee", "tss"
-      @process "widgets/#{widget}/controllers/", "coffee", "js"
+    widgetPath = @subfolder + "widgets/"
+    
+    if fs.existsSync widgetPath
+      widgets = fs.readdirSync widgetPath
+      
+      for widget in widgets
+        @process "widgets/#{widget}/views/", "jade", "xml"
+        @process "widgets/#{widget}/styles/", "coffee", "tss"
+        @process "widgets/#{widget}/controllers/", "coffee", "js"
 
   lib: ->
     @process "lib/", "coffee", "js"
@@ -238,9 +241,6 @@ class Compiler
   file: (from, output, type) ->
     @logger.info "[#{type}] #{from} --> #{output}"
 
-    subfolder = path.dirname(output)
-    fs.mkdirSync(subfolder, 0o777, true)
-
     data = fs.readFileSync from, 'utf8'
     
     try
@@ -250,24 +250,20 @@ class Compiler
       console.debug "[#{type}] #{e}, on line #{e.location.first_line} column #{e.location.first_column}"
 
     # Create the base path
-    @mkdirPSync output.split('/')[0...-1]
-
+    @mkdirPSync from.split('/')[0...-1]
     fs.writeFileSync output, compiled, 'utf8'
 
   files: (files, from, to, to_path) ->
     return @logger.debug "No '*.#{from}' files need to preprocess.. #{files.length} files" if files.length is 0
 
-    # Create necessary directory in case it doesn't exist
-    paths = ['app', 'app/controllers', 'app/styles', 'app/views', 'app/lib']
-    for path in paths
-      unless fs.existsSync path
-        fs.mkdirSync path
-
     for file in files
-      break if !!~ file.indexOf "lazyalloy"
+      break if file.indexOf("lazyalloy") > -1
 
+      # Replace file extention
       output = file.substring(0, file.length - from.length).toString() + to
-      output = output.replace(new RegExp('(.*)'+@subfolder), '$1app/') # Replacing subfolder with app. Only last occurence in case it exists twice in the path.
+
+      # Replace subfolder with app. Only last occurence in case it exists twice in the path.
+      output = output.replace(new RegExp('(.*)'+@subfolder), '$1app/')
 
       @file file, output, to
 
