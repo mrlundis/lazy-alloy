@@ -282,11 +282,11 @@ class Compiler
 
       # Complie any parent templates
       extendName = data.match /extends? ['"]?(.+)['"]?/
+      compiler.templateDependees = compiler.templateDependees || {}
       
       if extendName && extendName[1]
         extendFile = from.split('/')[0...-1].join('/') + '/' + extendName[1] + '.jade'
 
-        compiler.templateDependees = compiler.templateDependees || {}
         compiler.templateDependees[extendFile] = compiler.templateDependees[extendFile] || []
         
         if compiler.templateDependees[extendFile].indexOf(from) == -1
