@@ -259,7 +259,7 @@ class Compiler
         console.debug "[#{type}] #{e}"
 
     # Create the base path
-    @mkdirPSync from.split('/')[0...-1]
+    @mkdirPSync output.split('/')[0...-1]
     fs.writeFileSync output, compiled, 'utf8'
 
   files: (files, from, to, to_path) ->

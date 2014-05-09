@@ -346,7 +346,7 @@ Compiler = (function() {
         console.debug("[" + type + "] " + e);
       }
     }
-    this.mkdirPSync(from.split('/').slice(0, -1));
+    this.mkdirPSync(output.split('/').slice(0, -1));
     return fs.writeFileSync(output, compiled, 'utf8');
   };
 
